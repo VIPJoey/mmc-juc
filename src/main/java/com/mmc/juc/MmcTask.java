@@ -2,6 +2,7 @@ package com.mmc.juc;
 
 import java.util.List;
 import java.util.concurrent.RecursiveTask;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class MmcTask<T, R> extends RecursiveTask<R> {
     private List<T> taskSource;
@@ -11,8 +12,10 @@ public class MmcTask<T, R> extends RecursiveTask<R> {
     private int start;
     private int end;
     private RateLimiter rateLimiter;
+    private MmcTaskListener taskListener;
+    private AtomicInteger completedTasks;
 
-    public MmcTask(List<T> taskSource, MmcTaskProcessor<T, R> taskProcessor, MmcTaskMerger<R> taskMerger, int threshold, int start, int end, RateLimiter rateLimiter) {
+    public MmcTask(List<T> taskSource, MmcTaskProcessor<T, R> taskProcessor, MmcTaskMerger<R> taskMerger, int threshold, int start, int end, RateLimiter rateLimiter, MmcTaskListener taskListener, AtomicInteger completedTasks) {
         this.taskSource = taskSource;
         this.taskProcessor = taskProcessor;
         this.taskMerger = taskMerger;
@@ -20,6 +23,9 @@ public class MmcTask<T, R> extends RecursiveTask<R> {
         this.start = start;
         this.end = end;
         this.rateLimiter = rateLimiter;
+        this.taskListener = taskListener;
+        this.completedTasks = completedTasks;
+
     }
 
     @Override
@@ -35,14 +41,26 @@ public class MmcTask<T, R> extends RecursiveTask<R> {
         }
 
         if (end - start <= threshold) {
-            return taskProcessor.process(taskSource.subList(start, end));
+
+            // 在处理任务之前调用onTaskStarted方法
+            taskListener.onTaskStarted(completedTasks.get(), end - start);
+
+            R result = taskProcessor.process(taskSource.subList(start, end));
+
+            // 在任务完成后更新已完成任务的计数
+            int completed = completedTasks.addAndGet(end - start);
+
+            // 调用onTaskStarted方法，以便在每个小任务完成时更新已完成任务的计数
+            taskListener.onTaskStarted(completed, end - start - completed);
+
+            return result;
         }
 
         int middle = (start + end) / 2;
         MmcTask<T, R> leftTask = new MmcTask<>(taskSource, taskProcessor, taskMerger, threshold, start, middle,
-                rateLimiter);
+                rateLimiter, taskListener, completedTasks);
         MmcTask<T, R> rightTask = new MmcTask<>(taskSource, taskProcessor, taskMerger, threshold, middle, end,
-                rateLimiter);
+                rateLimiter, taskListener, completedTasks);
 
         leftTask.fork();
         R rightResult = rightTask.compute();
