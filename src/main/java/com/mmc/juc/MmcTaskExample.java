@@ -33,15 +33,9 @@ public class MmcTaskExample {
                 .taskProcessor(taskProcessor)
                 .taskMerger(taskMerger)
                 .threshold(10)
+                .rateLimiter(10, 10)  // 设置速率限制
                 .build();
 
-        mmcTaskExecutor.commit(result -> System.out.println("异步执行结果：" + result));  // 输出5050
-
-        // 等待异步任务完成，防止主线程提前退出
-        try {
-            Thread.sleep(1000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+        System.out.println("result: " + mmcTaskExecutor.execute());
     }
 }
