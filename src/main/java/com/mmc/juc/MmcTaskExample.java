@@ -4,29 +4,23 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class MmcTaskExample {
+
     public static void main(String[] args) {
+
         List<Integer> taskSource = new ArrayList<>();
         for (int i = 1; i <= 100; i++) {
             taskSource.add(i);
         }
 
-        MmcTaskProcessor<Integer, Integer> taskProcessor = new MmcTaskProcessor<Integer, Integer>() {
-            @Override
-            public Integer process(List<Integer> taskSource) {
-                int sum = 0;
-                for (Integer num : taskSource) {
-                    sum += num;
-                }
-                return sum;
+        MmcTaskProcessor<Integer, Integer> taskProcessor = taskSource1 -> {
+            int sum = 0;
+            for (Integer num : taskSource1) {
+                sum += num;
             }
+            return sum;
         };
 
-        MmcTaskMerger<Integer> taskMerger = new MmcTaskMerger<Integer>() {
-            @Override
-            public Integer merge(Integer leftResult, Integer rightResult) {
-                return leftResult + rightResult;
-            }
-        };
+        MmcTaskMerger<Integer> taskMerger = Integer::sum;
 
         MmcTaskExecutor<Integer, Integer> mmcTaskExecutor = MmcTaskExecutor.<Integer, Integer>builder()
                 .taskSource(taskSource)
@@ -34,6 +28,7 @@ public class MmcTaskExample {
                 .taskMerger(taskMerger)
                 .threshold(10)
                 .rateLimiter(10, 10)  // 设置速率限制
+                .forkJoinPoolConcurrency(4) // 设置ForkJoinPool的并发度为4
                 .build();
 
         System.out.println("result: " + mmcTaskExecutor.execute());

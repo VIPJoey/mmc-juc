@@ -93,6 +93,11 @@ public class MmcTaskExecutor<T, R> {
             return this;
         }
 
+        public Builder<T, R> forkJoinPoolConcurrency(int concurrency) {
+            this.forkJoinPool = new ForkJoinPool(concurrency);
+            return this;
+        }
+
         public MmcTaskExecutor<T, R> build() {
             return new MmcTaskExecutor<>(this);
         }
