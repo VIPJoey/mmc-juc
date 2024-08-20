@@ -13,6 +13,7 @@ public class MmcTaskExecutor<T, R> {
     private RateLimiter rateLimiter; // 添加令牌桶成员变量
     private MmcTaskListener taskListener;
     private AtomicInteger completedTasks = new AtomicInteger(); // 添加一个原子整数以跟踪已完成的任务数量
+    private String taskName;
 
     private MmcTaskExecutor(Builder<T, R> builder) {
         this.taskSource = builder.taskSource;
@@ -22,7 +23,7 @@ public class MmcTaskExecutor<T, R> {
         this.forkJoinPool = builder.forkJoinPool;
         this.rateLimiter = builder.rateLimiter;
         this.taskListener = builder.taskListener;
-
+        this.taskName = builder.taskName;
     }
 
     public static <T, R> Builder<T, R> builder() {
@@ -35,24 +36,52 @@ public class MmcTaskExecutor<T, R> {
         long startTime = System.currentTimeMillis();
         completedTasks.set(0); // 重置已完成任务的计数器
 
-        MmcTask<T, R> mmcTask = new MmcTask<>(taskSource, taskProcessor, taskMerger, threshold, 0, taskSource.size(),
-                rateLimiter, taskListener, completedTasks);
+        MmcTask<T, R> mmcTask = new MmcTask.Builder<T, R>()
+                .taskSource(taskSource)
+                .taskProcessor(taskProcessor)
+                .taskMerger(taskMerger)
+                .threshold(threshold)
+                .start(0)
+                .end(taskSource.size())
+                .rateLimiter(rateLimiter)
+                .taskListener(taskListener)
+                .completedTasks(completedTasks)
+                .taskName(taskName)
+                .build();
 
         // 调用onTasksSubmitted方法
-        taskListener.onTasksSubmitted(taskSource.size(), System.currentTimeMillis());
+        taskListener.onTasksSubmitted(mmcTask.getTaskName(), taskSource.size(), System.currentTimeMillis());
 
         R result = forkJoinPool.invoke(mmcTask);
 
         // 调用onTasksCompleted方法
         long elapsedTime = System.currentTimeMillis() - startTime;
-        taskListener.onTasksCompleted(elapsedTime, System.currentTimeMillis());
+        taskListener.onTasksCompleted(mmcTask.getTaskName(), elapsedTime, System.currentTimeMillis());
+
+        return result;
+    }
+
+    // 同步执行并返回结果
+    public R execute(MmcTask<T, R> mmcTask) {
+
+        long startTime = System.currentTimeMillis();
+        completedTasks.set(0); // 重置已完成任务的计数器
+
+        // 调用onTasksSubmitted方法
+        taskListener.onTasksSubmitted(mmcTask.getTaskName(), taskSource.size(), System.currentTimeMillis());
+
+        R result = forkJoinPool.invoke(mmcTask);
+
+        // 调用onTasksCompleted方法
+        long elapsedTime = System.currentTimeMillis() - startTime;
+        taskListener.onTasksCompleted(mmcTask.getTaskName(), elapsedTime, System.currentTimeMillis());
 
         return result;
     }
 
     // 异步执行
     public void commit() {
-        commit(null);
+        commit((result -> {}));
     }
 
     // 异步执行并获取结果
@@ -61,11 +90,21 @@ public class MmcTaskExecutor<T, R> {
         long startTime = System.currentTimeMillis();
         completedTasks.set(0); // 重置已完成任务的计数器
 
-        MmcTask<T, R> mmcTask = new MmcTask<>(taskSource, taskProcessor, taskMerger, threshold, 0, taskSource.size(),
-                rateLimiter, taskListener, completedTasks);
+        MmcTask<T, R> mmcTask = new MmcTask.Builder<T, R>()
+                .taskSource(taskSource)
+                .taskProcessor(taskProcessor)
+                .taskMerger(taskMerger)
+                .threshold(threshold)
+                .start(0)
+                .end(taskSource.size())
+                .rateLimiter(rateLimiter)
+                .taskListener(taskListener)
+                .completedTasks(completedTasks)
+                .taskName(taskName)
+                .build();
 
         // 调用onTasksSubmitted方法
-        taskListener.onTasksSubmitted(taskSource.size(), System.currentTimeMillis());
+        taskListener.onTasksSubmitted(mmcTask.getTaskName(), taskSource.size(), System.currentTimeMillis());
 
         forkJoinPool.submit(() -> {
 
@@ -73,7 +112,7 @@ public class MmcTaskExecutor<T, R> {
 
             // 调用onTasksCompleted方法
             long elapsedTime = System.currentTimeMillis() - startTime;
-            taskListener.onTasksCompleted(elapsedTime, System.currentTimeMillis());
+            taskListener.onTasksCompleted(mmcTask.getTaskName(), elapsedTime, System.currentTimeMillis());
 
             if (callback != null) {
                 callback.onComplete(result);
@@ -82,6 +121,8 @@ public class MmcTaskExecutor<T, R> {
     }
 
     public static class Builder<T, R> {
+
+        private String taskName;
         private List<T> taskSource;
         private MmcTaskProcessor<T, R> taskProcessor;
         private MmcTaskMerger<R> taskMerger;
@@ -127,6 +168,11 @@ public class MmcTaskExecutor<T, R> {
 
         public Builder<T, R> forkJoinPool(ForkJoinPool forkJoinPool) {
             this.forkJoinPool = forkJoinPool;
+            return this;
+        }
+
+        public Builder<T, R> taskName(String taskName) {
+            this.taskName = taskName;
             return this;
         }
 
