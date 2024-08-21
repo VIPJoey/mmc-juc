@@ -34,9 +34,14 @@ public class MmcTask<T, R> extends RecursiveTask<R> {
         this.taskRuntime = builder.taskRuntime;
     }
 
+    public static <T, R> Builder<T, R> builder() {
+        return new Builder<>();
+    }
+
     @Data
     @Accessors(fluent = true)
     public static class Builder<T, R> {
+
         private List<T> taskSource;
         private MmcTaskProcessor<T, R> taskProcessor;
         private MmcTaskMerger<R> taskMerger;

@@ -33,5 +33,21 @@ public class MmcTaskExample {
                 .build();
 
         System.out.println("result: " + mmcTaskExecutor.execute());
+
+        Integer r = mmcTaskExecutor.execute(MmcTask.<Integer, Integer>builder()
+                .taskSource(taskSource)
+                .taskProcessor(taskProcessor)
+                .taskMerger(taskMerger)
+                .rateLimiter(new TokenBucket(10, 20))
+                .taskProcessor(taskProcessor)
+                .taskListener(new DefaultMmcTaskListener())
+                .threshold(10)
+                .start(0)
+                .end(taskSource.size())
+                .taskName("taskName")
+                .taskRuntime(new TaskRuntime("taskName", taskSource.size()))
+                .build()
+        );
+        System.out.println("result: " + r);
     }
 }
