@@ -1,18 +1,27 @@
 package com.mmc.juc;
 
 public class DefaultMmcTaskListener implements MmcTaskListener {
+
+
     @Override
-    public void onTasksSubmitted(String taskName, int totalTasks, long startTime) {
-        System.out.println("[" + taskName + "] Tasks submitted. Total tasks: " + totalTasks + ", start time: " + startTime);
+    public void onTasksSubmitted(TaskRuntime taskRuntime) {
+        System.out.println(
+                "[" + taskRuntime.getTaskName() + "] Tasks submitted. Total tasks: " + taskRuntime.getTotalTasks());
+
     }
 
     @Override
-    public void onTaskStarted(String taskName, int completedTasks, int remainingTasks) {
-        System.out.println("[" + taskName + "] Task started. Completed tasks: " + completedTasks + ", remaining tasks: " + remainingTasks);
+    public void onTaskStarted(TaskRuntime taskRuntime) {
+        System.out.println(
+                "[" + taskRuntime.getTaskName() + "] Task started. Completed tasks: " + taskRuntime.getCompletedTasks()
+                        .get() + ", remaining tasks: " + taskRuntime.getRemainingTasks().get());
+
     }
 
     @Override
-    public void onTasksCompleted(String taskName, long elapsedTime, long endTime) {
-        System.out.println("[" + taskName + "] Tasks completed. Elapsed time: " + elapsedTime + " ms, end time: " + endTime);
+    public void onTasksCompleted(TaskRuntime taskRuntime, long elapsedTime) {
+        System.out.println(
+                "[" + taskRuntime.getTaskName() + "] Tasks completed. Elapsed time: " + elapsedTime + " ms ");
+
     }
 }

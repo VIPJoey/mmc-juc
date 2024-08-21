@@ -28,7 +28,7 @@ public class MmcTaskExample {
                 .taskMerger(taskMerger)
                 .threshold(10)
                 .taskName("mmcTaskExample")
-                .rateLimiter(10, 2)  // 设置速率限制
+                .rateLimiter(10, 20)  // 设置速率限制
                 .forkJoinPoolConcurrency(4) // 设置ForkJoinPool的并发度为4
                 .build();
 

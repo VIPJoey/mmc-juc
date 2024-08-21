@@ -18,8 +18,8 @@ public class MmcTask<T, R> extends RecursiveTask<R> {
     private int end;
     private RateLimiter rateLimiter;
     private MmcTaskListener taskListener;
-    private AtomicInteger completedTasks;
     private String taskName;
+    private TaskRuntime taskRuntime;
 
     private MmcTask(Builder<T, R> builder) {
         this.taskSource = builder.taskSource;
@@ -30,8 +30,8 @@ public class MmcTask<T, R> extends RecursiveTask<R> {
         this.end = builder.end;
         this.rateLimiter = builder.rateLimiter;
         this.taskListener = builder.taskListener;
-        this.completedTasks = builder.completedTasks;
         this.taskName = builder.taskName;
+        this.taskRuntime = builder.taskRuntime;
     }
 
     @Data
@@ -47,6 +47,7 @@ public class MmcTask<T, R> extends RecursiveTask<R> {
         private MmcTaskListener taskListener;
         private AtomicInteger completedTasks;
         private String taskName;
+        private TaskRuntime taskRuntime;
 
         public MmcTask<T, R> build() {
             return new MmcTask<>(this);
@@ -67,16 +68,14 @@ public class MmcTask<T, R> extends RecursiveTask<R> {
 
         if (end - start <= threshold) {
 
-            // 在处理任务之前调用onTaskStarted方法
-            taskListener.onTaskStarted(taskName, completedTasks.get(), end - start);
-
             R result = taskProcessor.process(taskSource.subList(start, end));
 
             // 在任务完成后更新已完成任务的计数
-            int completed = completedTasks.addAndGet(end - start);
+            taskRuntime.getCompletedTasks().addAndGet(end - start);
+            taskRuntime.getRemainingTasks().set(taskRuntime.getTotalTasks() - taskRuntime.getCompletedTasks().get());
 
             // 调用onTaskStarted方法，以便在每个小任务完成时更新已完成任务的计数
-            taskListener.onTaskStarted(taskName, completed, end - start - completed);
+            taskListener.onTaskStarted(taskRuntime);
 
             return result;
         }
@@ -91,8 +90,8 @@ public class MmcTask<T, R> extends RecursiveTask<R> {
                 .end(middle)
                 .rateLimiter(rateLimiter)
                 .taskListener(taskListener)
-                .completedTasks(completedTasks)
                 .taskName(taskName)
+                .taskRuntime(taskRuntime)
                 .build();
 
         MmcTask<T, R> rightTask = new MmcTask.Builder<T, R>()
@@ -104,8 +103,8 @@ public class MmcTask<T, R> extends RecursiveTask<R> {
                 .end(end)
                 .rateLimiter(rateLimiter)
                 .taskListener(taskListener)
-                .completedTasks(completedTasks)
                 .taskName(taskName)
+                .taskRuntime(taskRuntime)
                 .build();
 
         leftTask.fork();
