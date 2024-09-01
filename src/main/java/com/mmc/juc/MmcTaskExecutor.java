@@ -1,9 +1,12 @@
 package com.mmc.juc;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ForkJoinPool;
+import lombok.Setter;
 
-public class MmcTaskExecutor<T, R> {
+@Setter
+public class MmcTaskExecutor<T, R> implements TaskExecutor<T, R> {
 
     private List<T> taskSource;
     private MmcTaskProcessor<T, R> taskProcessor;
@@ -29,82 +32,114 @@ public class MmcTaskExecutor<T, R> {
         return new Builder<>();
     }
 
-    // 同步执行并返回结果
-    public R execute() {
+    // 检查并设置MmcTask的参数
+    private void checkAndSet(MmcTask<T, R> mmcTask) {
 
-        long startTime = System.currentTimeMillis();
-        TaskRuntime taskRuntime = new TaskRuntime(taskName, taskSource.size());
+        // 检查MmcTask的构造参数，如果为空，则使用MmcTaskExecutor的参数
+        List<T> taskSource = mmcTask.getTaskSource() != null ? mmcTask.getTaskSource() : this.taskSource;
+        MmcTaskProcessor<T, R> taskProcessor = mmcTask.getTaskProcessor() != null ? mmcTask.getTaskProcessor() : this.taskProcessor;
+        MmcTaskMerger<R> taskMerger = mmcTask.getTaskMerger() != null ? mmcTask.getTaskMerger() : this.taskMerger;
+        RateLimiter rateLimiter = mmcTask.getRateLimiter() != null ? mmcTask.getRateLimiter() : this.rateLimiter;
+        MmcTaskListener taskListener = mmcTask.getTaskListener() != null ? mmcTask.getTaskListener() : this.taskListener;
+        String taskName = mmcTask.getTaskName() != null ? mmcTask.getTaskName() : this.taskName;
+        int threshold = mmcTask.getThreshold() > 0 ? mmcTask.getThreshold() : this.threshold;
+
+        // 如果参数为空，则抛出异常
+        Objects.requireNonNull(taskSource, "TaskSource cannot be null.");
+        Objects.requireNonNull(taskProcessor, "TaskProcessor cannot be null.");
+        Objects.requireNonNull(taskMerger, "TaskMerger cannot be null.");
+        Objects.requireNonNull(rateLimiter, "RateLimiter cannot be null.");
+        Objects.requireNonNull(taskListener, "TaskListener cannot be null.");
+        Objects.requireNonNull(taskName, "TaskName cannot be null.");
+
+        // 将最终参数赋值给MmcTask
+        TaskRuntime taskRuntime = new TaskRuntime(mmcTask.getTaskName(), mmcTask.getTaskSource().size());
+        mmcTask.setTaskSource(taskSource);
+        mmcTask.setTaskProcessor(taskProcessor);
+        mmcTask.setTaskMerger(taskMerger);
+        mmcTask.setRateLimiter(rateLimiter);
+        mmcTask.setTaskListener(taskListener);
+        mmcTask.setTaskName(taskName);
+        mmcTask.setStart(0);
+        mmcTask.setEnd(taskSource.size());
+        mmcTask.setTaskRuntime(taskRuntime);
+        mmcTask.setThreshold(threshold);
+    }
+
+    // 同步执行并返回结果
+    @Override
+    public R execute() {
 
         MmcTask<T, R> mmcTask = new MmcTask.Builder<T, R>()
                 .taskSource(taskSource)
                 .taskProcessor(taskProcessor)
                 .taskMerger(taskMerger)
                 .threshold(threshold)
-                .start(0)
-                .end(taskSource.size())
                 .rateLimiter(rateLimiter)
                 .taskListener(taskListener)
                 .taskName(taskName)
-                .taskRuntime(taskRuntime)
                 .build();
 
-        // 调用onTasksSubmitted方法
-        taskListener.onTasksSubmitted(taskRuntime);
-
-        R result = forkJoinPool.invoke(mmcTask);
-
-        // 调用onTasksCompleted方法
-        long elapsedTime = System.currentTimeMillis() - startTime;
-        taskListener.onTasksCompleted(taskRuntime, elapsedTime);
-
-        return result;
+        return execute(mmcTask);
     }
 
     // 同步执行并返回结果
+    @Override
     public R execute(MmcTask<T, R> mmcTask) {
 
+        // 检查MmcTask的构造参数，如果为空，则使用MmcTaskExecutor的参数
+        checkAndSet(mmcTask);
+
         long startTime = System.currentTimeMillis();
-        TaskRuntime taskRuntime = new TaskRuntime(taskName, taskSource.size());
+        mmcTask.setTaskRuntime(mmcTask.getTaskRuntime());
 
         // 调用onTasksSubmitted方法
-        taskListener.onTasksSubmitted(taskRuntime);
+        taskListener.onTasksSubmitted(mmcTask.getTaskRuntime());
 
         R result = forkJoinPool.invoke(mmcTask);
 
         // 调用onTasksCompleted方法
         long elapsedTime = System.currentTimeMillis() - startTime;
-        taskListener.onTasksCompleted(taskRuntime, elapsedTime);
+        taskListener.onTasksCompleted(mmcTask.getTaskRuntime(), elapsedTime);
 
         return result;
     }
 
     // 异步执行
+    @Override
     public void commit() {
         commit((result -> {
         }));
     }
 
     // 异步执行并获取结果
+    @Override
     public void commit(MmcTaskCallback<R> callback) {
-
-        long startTime = System.currentTimeMillis();
-        TaskRuntime taskRuntime = new TaskRuntime(taskName, taskSource.size());
 
         MmcTask<T, R> mmcTask = new MmcTask.Builder<T, R>()
                 .taskSource(taskSource)
                 .taskProcessor(taskProcessor)
                 .taskMerger(taskMerger)
                 .threshold(threshold)
-                .start(0)
-                .end(taskSource.size())
                 .rateLimiter(rateLimiter)
                 .taskListener(taskListener)
                 .taskName(taskName)
-                .taskRuntime(taskRuntime)
                 .build();
 
+       commit(mmcTask, callback);
+    }
+
+    // 异步执行并获取结果
+    @Override
+    public void commit(MmcTask<T, R> mmcTask, MmcTaskCallback<R> callback) {
+
+        // 检查MmcTask的构造参数，如果为空，则使用MmcTaskExecutor的参数
+        checkAndSet(mmcTask);
+
+        long startTime = System.currentTimeMillis();
+
         // 调用onTasksSubmitted方法
-        taskListener.onTasksSubmitted(taskRuntime);
+        taskListener.onTasksSubmitted(mmcTask.getTaskRuntime());
 
         forkJoinPool.submit(() -> {
 
@@ -112,7 +147,7 @@ public class MmcTaskExecutor<T, R> {
 
             // 调用onTasksCompleted方法
             long elapsedTime = System.currentTimeMillis() - startTime;
-            taskListener.onTasksCompleted(taskRuntime, elapsedTime);
+            taskListener.onTasksCompleted(mmcTask.getTaskRuntime(), elapsedTime);
 
             if (callback != null) {
                 callback.onComplete(result);
@@ -182,6 +217,11 @@ public class MmcTaskExecutor<T, R> {
         }
 
         public MmcTaskExecutor<T, R> build() {
+
+            if (null == this.forkJoinPool) {
+                this.forkJoinPool = new ForkJoinPool();
+            }
+
             return new MmcTaskExecutor<>(this);
         }
     }

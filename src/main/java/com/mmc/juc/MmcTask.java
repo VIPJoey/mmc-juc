@@ -5,8 +5,10 @@ import java.util.concurrent.RecursiveTask;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.Data;
 import lombok.Getter;
+import lombok.Setter;
 import lombok.experimental.Accessors;
 
+@Setter
 @Getter
 public class MmcTask<T, R> extends RecursiveTask<R> {
 
