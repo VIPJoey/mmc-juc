@@ -1,4 +1,4 @@
-# mmc-juc [V1.0]
+# mmc-juc [V1.1]
 
 利用AI大模型，基于ForkJoinPool封装的多线程库，尤其适合单次长任务场景，例如遍历DB等检索任务，也支持批量小任务，例如kafka消息批量处理等，开箱即用。
 
@@ -17,7 +17,7 @@
 <dependency>
     <groupId>io.github.vipjoey</groupId>
     <artifactId>mmc-juc</artifactId>
-    <version>1.0</version>
+    <version>1.1</version>
 </dependency>
 
 ```
