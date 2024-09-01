@@ -2,9 +2,9 @@ package com.mmc.juc;
 
 import java.util.List;
 import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class MmcTaskExecutor<T, R> {
+
     private List<T> taskSource;
     private MmcTaskProcessor<T, R> taskProcessor;
     private MmcTaskMerger<R> taskMerger;
@@ -80,7 +80,8 @@ public class MmcTaskExecutor<T, R> {
 
     // 异步执行
     public void commit() {
-        commit((result -> {}));
+        commit((result -> {
+        }));
     }
 
     // 异步执行并获取结果
