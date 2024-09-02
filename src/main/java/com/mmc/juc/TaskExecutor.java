@@ -13,8 +13,8 @@ package com.mmc.juc;
 /**
  * TaskExecutor.
  *
- * @author tenkye
- * @date 2024/9/1 16:16
+ * @author VIPJoey
+ * @since 2024/9/1 16:16
  */
 public interface TaskExecutor<T, R> {
 
